@@ -11,6 +11,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include "game.h"
+#include "user.h"
 
 int main(int argc, char** argv )
 { char datas[] = "hello\n";
@@ -18,6 +20,9 @@ int main(int argc, char** argv )
   char c;
   struct sockaddr_in cli_addr,serv_addr;
   
+
+  User online_users[10];
+  Game active_games[10];
 
   if (argc!=2) {printf ("usage: socket_server port\n");exit(0);}
  
@@ -37,22 +42,47 @@ int main(int argc, char** argv )
      {printf ("impossible de faire le bind\n");exit(0);} // unable to do the bind
 
   /* small initialisation */
-  listen(sockfd,1);
+  listen(sockfd,5);
      
-  /* waits for a client connection */
-  clilen = sizeof (cli_addr);
-  newsockfd = accept (sockfd,(struct sockaddr*) &cli_addr, &clilen);
-  if (newsockfd<0) {printf ("accept error\n"); exit(0);}
-  printf ("connection accepted\n");
+//   /* waits for a client connection */
+//   clilen = sizeof (cli_addr);
+//   newsockfd = accept (sockfd,(struct sockaddr*) &cli_addr, &clilen);
+//   if (newsockfd<0) {printf ("accept error\n"); exit(0);}
+//   printf ("connection accepted\n");
+
+//   User user;
+//     registerUser(&user, newsockfd);
+//     printf("Please enter your username: ");
+//     char username[10];
+//     scanf("%9s", username);
+//     setUsername(&user, username);
+//     printf("User joined with username: %s\n", user.username);
+
+
 
   
-  while (1)
-   { while (read(newsockfd,&c,1)!=1);
+//   while (1)
+//    { while (read(newsockfd,&c,1)!=1);
 
-    
+//      printf("%c",c); 
+//    }
+    while (1) {
+        clilen = sizeof (cli_addr);
+        newsockfd = accept (sockfd,(struct sockaddr*) &cli_addr, &clilen);
+        if (newsockfd<0) {printf ("accept error\n"); exit(0);}
+        printf ("connection accepted\n");
 
-     printf("%c",c); 
-   }
+        chilpid = fork();
+
+        if (chilpid < 0) {
+          printf("Fork failed\n");
+          close(newsockfd);
+      }
+
+      else if (chilpid == 0) {
+          close(sockfd); 
+          registerUser(&online_users[0], newsockfd);
+    }
       
    /*  attention il s'agit d'une boucle infinie 
     *  le socket nn'est jamais ferme !
