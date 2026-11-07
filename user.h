@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 
+#define MAX_USERS 100
+#define MAX_USERNAME_LEN 50
+
 typedef struct Game Game;
 
 typedef struct User {

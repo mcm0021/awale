@@ -36,6 +36,12 @@ typedef struct in_addr IN_ADDR;
 #include "user.h"
 #include "game.h"
 
+struct ServerContext {
+    User online_users[MAX_CLIENTS];
+    Game active_games[10];
+    int user_count;
+};
+
 static void init(void);
 static void end(void);
 static void app(void);
