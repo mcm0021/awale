@@ -10,7 +10,7 @@ typedef struct Game Game;
 
 typedef struct User {
     int sockfd;
-    char username[10];
+    char username[MAX_USERNAME_LEN];
     char bio[10];
     Game *saved_games[10];
     bool isprivate;

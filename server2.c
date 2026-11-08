@@ -5,7 +5,7 @@
 
 #include "server2.h"
 
-static void init(void)
+void init(void)
 {
 #ifdef WIN32
    WSADATA wsa;
@@ -18,14 +18,14 @@ static void init(void)
 #endif
 }
 
-static void end(void)
+void end(void)
 {
 #ifdef WIN32
    WSACleanup();
 #endif
 }
 
-static void app(void)
+void app(void)
 {
    SOCKET sock = init_connection();
    char buffer[BUF_SIZE];
@@ -81,9 +81,18 @@ static void app(void)
          }
 
          /* after connecting the client sends its name */
-         if(read_client(csock, buffer) == -1)
+         if(read_client(csock, buffer) <= 0)
          {
             /* disconnected */
+            closesocket(csock);
+            continue;
+         }
+
+         if(actual >= MAX_CLIENTS)
+         {
+            const char *msg = "Server full.\n";
+            write_client(csock, msg);
+            closesocket(csock);
             continue;
          }
 
@@ -112,6 +121,7 @@ static void app(void)
                   closesocket(online_users[i].sockfd);
                   remove_client(online_users, i, &actual);
                   strncpy(buffer, user.username, BUF_SIZE - 1);
+                  buffer[BUF_SIZE - 1] = 0;
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
                   send_message_to_all_clients(online_users, user, actual, buffer, 1);
                }
@@ -129,7 +139,7 @@ static void app(void)
    end_connection(sock);
 }
 
-static void clear_clients(User *clients, int actual)
+void clear_clients(User *clients, int actual)
 {
    int i = 0;
    for(i = 0; i < actual; i++)
@@ -138,7 +148,7 @@ static void clear_clients(User *clients, int actual)
    }
 }
 
-static void remove_client(User *clients, int to_remove, int *actual)
+void remove_client(User *clients, int to_remove, int *actual)
 {
    /* we remove the client in the array */
    memmove(clients + to_remove, clients + to_remove + 1, (*actual - to_remove - 1) * sizeof(User));
@@ -146,19 +156,20 @@ static void remove_client(User *clients, int to_remove, int *actual)
    (*actual)--;
 }
 
-static void send_message_to_all_clients(User *clients, User sender, int actual, const char *buffer, char from_server)
+void send_message_to_all_clients(User *clients, User sender, int actual, const char *buffer, char from_server)
 {
    int i = 0;
    char message[BUF_SIZE];
-   message[0] = 0;
    for(i = 0; i < actual; i++)
    {
       /* we don't send message to the sender */
       if(sender.sockfd != clients[i].sockfd)
       {
+         message[0] = 0;
          if(from_server == 0)
          {
             strncpy(message, sender.username, BUF_SIZE - 1);
+            message[BUF_SIZE - 1] = 0;
             strncat(message, " : ", sizeof message - strlen(message) - 1);
          }
          strncat(message, buffer, sizeof message - strlen(message) - 1);
@@ -167,7 +178,7 @@ static void send_message_to_all_clients(User *clients, User sender, int actual, 
    }
 }
 
-static int init_connection(void)
+int init_connection(void)
 {
    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
    SOCKADDR_IN sin = { 0 };
@@ -197,12 +208,12 @@ static int init_connection(void)
    return sock;
 }
 
-static void end_connection(int sock)
+void end_connection(int sock)
 {
    closesocket(sock);
 }
 
-static int read_client(SOCKET sock, char *buffer)
+int read_client(SOCKET sock, char *buffer)
 {
    int n = 0;
 
@@ -218,7 +229,7 @@ static int read_client(SOCKET sock, char *buffer)
    return n;
 }
 
-static void write_client(SOCKET sock, const char *buffer)
+void write_client(SOCKET sock, const char *buffer)
 {
    if(send(sock, buffer, strlen(buffer), 0) < 0)
    {
@@ -229,6 +240,9 @@ static void write_client(SOCKET sock, const char *buffer)
 
 int main(int argc, char **argv)
 {
+   (void)argc;
+   (void)argv;
+
    init();
 
    app();

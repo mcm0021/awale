@@ -27,9 +27,7 @@ static const char* ALL_COMMANDS[] = {
     NEXT_MOVE_COMMAND, SAVE_GAME_COMMAND, QUIT_COMMAND
 };
 
-typedef struct ServerContext ServerContext;
-
-typedef char* (*CommandHandler)(struct ServerContext* ctx, int argc, char** args);
+typedef const char* (*CommandHandler)(ServerContext* ctx, int argc, char** args);
 
 typedef struct {
     const char* name;
@@ -37,7 +35,10 @@ typedef struct {
     const char* usage;
 } CommandMapping;
 
-char* handle_register(ServerContext* ctx, int argc, char** args) {
+int parse_arguments(char* line, char** args, int max_args);
+const char* dispatch_command(ServerContext* ctx, char* line);
+
+const char* handle_register(ServerContext* ctx, int argc, char** args) {
     if (argc < 2) {
         return "Error: Username is required. Usage: register <username>\n";
     }
@@ -59,10 +60,10 @@ char* handle_register(ServerContext* ctx, int argc, char** args) {
     }
 
     User* new_user = &ctx->online_users[ctx->user_count];
+    memset(new_user, 0, sizeof(User));
     strncpy(new_user->username, requested_username, MAX_USERNAME_LEN - 1);
     new_user->username[MAX_USERNAME_LEN - 1] = '\0'; // Ensure safety
     new_user->bio[0] = '\0'; // Empty initial bio
-    new_user -= 1;
 
     ctx->user_count++;
 
@@ -76,7 +77,19 @@ static const CommandMapping COMMAND_TABLE[] = {
 #define NUM_COMMANDS (sizeof(COMMAND_TABLE) / sizeof(COMMAND_TABLE[0]))
 
 int handle_command(ServerContext* ctx, const char* command_line, char* response_buffer, size_t buffer_size, char* send_to_usernames, size_t send_to_usernames_size) {
-    const char* result = dispatch_command(ctx, (char*)command_line);
+    (void)send_to_usernames;
+    (void)send_to_usernames_size;
+    (void)ALL_COMMANDS;
+
+    if (command_line == NULL || response_buffer == NULL || buffer_size == 0) {
+        return -1;
+    }
+
+    char cmd_copy[BUF_SIZE];
+    strncpy(cmd_copy, command_line, sizeof(cmd_copy) - 1);
+    cmd_copy[sizeof(cmd_copy) - 1] = '\0';
+
+    const char* result = dispatch_command(ctx, cmd_copy);
 
     if (result != NULL) {
         snprintf(response_buffer, buffer_size, "%s", result);

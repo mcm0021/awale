@@ -54,7 +54,10 @@ static void app(const char *address, const char *name)
       /* something from standard input : i.e keyboard */
       if(FD_ISSET(STDIN_FILENO, &rdfs))
       {
-         fgets(buffer, BUF_SIZE - 1, stdin);
+         if(fgets(buffer, BUF_SIZE - 1, stdin) == NULL)
+         {
+            break;
+         }
          {
             char *p = NULL;
             p = strstr(buffer, "\n");
@@ -149,7 +152,7 @@ static void write_server(SOCKET sock, const char *buffer)
 
 int main(int argc, char **argv)
 {
-   if(argc < 2)
+   if(argc < 3)
    {
       printf("Usage : %s [address] [pseudo]\n", argv[0]);
       return EXIT_FAILURE;

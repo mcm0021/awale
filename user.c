@@ -15,10 +15,12 @@ void registerUser(User* user, int sockfd) {
 
 void setUsername(User* user, const char* username) {
     strncpy(user->username, username, sizeof(user->username) - 1);
+    user->username[sizeof(user->username) - 1] = '\0';
 }
 
 void setBio(User* user, const char* bio) {
     strncpy(user->bio, bio, sizeof(user->bio) - 1);
+    user->bio[sizeof(user->bio) - 1] = '\0';
 }
 
 void addFriend(User* user, User* friend) {
@@ -32,6 +34,7 @@ void addFriend(User* user, User* friend) {
         }
     }
 }
+
 
 void makePrivate(User* user) {
     user->isprivate = true;
