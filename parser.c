@@ -3,6 +3,7 @@
 #include <string.h>
 #include "server2.h"
 #include "user.h"
+#include <stdint.h>
 
 #define MAX_ARGS 100
 #define REGISTER_COMMAND "register"
@@ -27,7 +28,7 @@ static const char* ALL_COMMANDS[] = {
     NEXT_MOVE_COMMAND, SAVE_GAME_COMMAND, QUIT_COMMAND
 };
 
-typedef const char* (*CommandHandler)(ServerContext* ctx, int argc, char** args);
+typedef const char* (*CommandHandler)(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to);
 
 typedef struct {
     const char* name;
@@ -36,50 +37,112 @@ typedef struct {
 } CommandMapping;
 
 int parse_arguments(char* line, char** args, int max_args);
-const char* dispatch_command(ServerContext* ctx, char* line);
+const char* dispatch_command(ServerContext* ctx, char* line, size_t user_index, size_t* sent_to);
 
-const char* handle_register(ServerContext* ctx, int argc, char** args) {
+const char* handle_add_bio(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
     if (argc < 2) {
-        return "Error: Username is required. Usage: register <username>\n";
+        return "Error: Bio is required. Usage: add_bio <bio>\n";
     }
 
-    const char* requested_username = args[1];
+    User* user = &ctx->online_users[user_index];
+    const char* new_bio = args[1];
+    user->bio[0] = '\0'; // Clear existing bio
+    strncat(user->bio, new_bio, sizeof(user->bio) - 1);
+    *sent_to = user_index;
 
-    if (strlen(requested_username) >= MAX_USERNAME_LEN) {
-        return "Error: Username is too long.\n";
-    }
+    *sent_to = user_index; 
+    return "Bio updated successfully.\n";
+}
 
-    if (ctx->user_count >= MAX_USERS) {
-        return "Error: Server user capacity reached.\n";
-    }
+const char* get_online_users(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
+    User* user = &ctx->online_users[user_index];
+    static char response[BUF_SIZE];
+    response[0] = '\0';
 
     for (int i = 0; i < ctx->user_count; i++) {
-        if (strcmp(ctx->online_users[i].username, requested_username) == 0) {
-            return "Error: Username already exists.\n";
+        size_t used = strlen(response);
+        if (used >= sizeof(response) - 1) {
+            break;
+        }
+
+        snprintf(response + used, sizeof(response) - used, "%s: %s\n",
+                 ctx->online_users[i].username, ctx->online_users[i].bio);
+    }
+
+    *sent_to = user_index; 
+    return response;
+}
+
+const char* handle_add_friend(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
+    if (argc < 2) {
+        return "Error: Friend username is required. Usage: add_friend <username>\n";
+    }
+
+    User* user = &ctx->online_users[user_index];
+    const char* friend_username = args[1];
+
+    for (int i = 0; i < ctx->user_count; i++) {
+        if (strcmp(ctx->online_users[i].username, friend_username) == 0) {
+            for (int j = 0; j < 10; j++) {
+                if (user->friends[j] == NULL) {
+                    user->friends[j] = &ctx->online_users[i];
+                    *sent_to = user_index; 
+                    return "Friend added successfully.\n";
+                }
+            }
+            return "Error: Friend list is full.\n";
         }
     }
 
-    User* new_user = &ctx->online_users[ctx->user_count];
-    memset(new_user, 0, sizeof(User));
-    strncpy(new_user->username, requested_username, MAX_USERNAME_LEN - 1);
-    new_user->username[MAX_USERNAME_LEN - 1] = '\0'; // Ensure safety
-    new_user->bio[0] = '\0'; // Empty initial bio
+    return "Error: User not found.\n";
+}
 
-    ctx->user_count++;
+const char* handle_change_mode(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
+    if (argc < 2) {
+        return "Error: Mode is required. Usage: change_mode <public|private>\n";
+    }
 
-    return "User registered successfully.\n";
+    User* user = &ctx->online_users[user_index];
+    const char* mode = args[1];
+
+    if (strcmp(mode, "public") == 0) {
+        user->isprivate = false;
+        *sent_to = user_index; 
+        return "Mode changed to public.\n";
+    } else if (strcmp(mode, "private") == 0) {
+        user->isprivate = true;
+        *sent_to = user_index; 
+        return "Mode changed to private.\n";
+    } else {
+        return "Error: Invalid mode. Use 'public' or 'private'.\n";
+    }
+}
+
+const char* handle_send_message(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
+    if (argc < 2) {
+        return "Error: \n";
+    }
+
+    User* sender = &ctx->online_users[user_index];
+    const char* message = args[1];
+
+    char full_message[BUF_SIZE];
+    snprintf(full_message, sizeof(full_message), "%s: %s\n", sender->username, message);
+    *sent_to = SIZE_MAX; 
+    return full_message; 
 }
 
 static const CommandMapping COMMAND_TABLE[] = {
-    { REGISTER_COMMAND,  handle_register,  "register <username>" },
+    { ADD_BIO_COMMAND,  handle_add_bio,  "add_bio <bio>" },
+    { GET_ONLINE_USERS_COMMAND, get_online_users, "get_online_users" },
+    { ADD_FRIEND_COMMAND, handle_add_friend, "add_friend <username>" },
+    { CHANGE_MODE_COMMAND, handle_change_mode, "change_mode <public|private>" },
+    { SEND_MESSAGE_COMMAND, handle_send_message, "send_message <message>"}
 };
 
 #define NUM_COMMANDS (sizeof(COMMAND_TABLE) / sizeof(COMMAND_TABLE[0]))
 
-int handle_command(ServerContext* ctx, const char* command_line, char* response_buffer, size_t buffer_size, char* send_to_usernames, size_t send_to_usernames_size) {
-    (void)send_to_usernames;
-    (void)send_to_usernames_size;
-    (void)ALL_COMMANDS;
+int handle_command(ServerContext* ctx, const char* command_line, char* response_buffer, size_t buffer_size, size_t user_index, size_t* sent_to) {
 
     if (command_line == NULL || response_buffer == NULL || buffer_size == 0) {
         return -1;
@@ -89,7 +152,7 @@ int handle_command(ServerContext* ctx, const char* command_line, char* response_
     strncpy(cmd_copy, command_line, sizeof(cmd_copy) - 1);
     cmd_copy[sizeof(cmd_copy) - 1] = '\0';
 
-    const char* result = dispatch_command(ctx, cmd_copy);
+    const char* result = dispatch_command(ctx, cmd_copy, user_index, sent_to);
 
     if (result != NULL) {
         snprintf(response_buffer, buffer_size, "%s", result);
@@ -133,7 +196,7 @@ int parse_arguments(char* line, char** args, int max_args) {
 /**
  * Matches and executes the command using the dispatcher table.
  */
-const char* dispatch_command(ServerContext* ctx, char* line) {
+const char* dispatch_command(ServerContext* ctx, char* line, size_t user_index, size_t* sent_to) {
     char* args[MAX_ARGS];
     int argc = parse_arguments(line, args, MAX_ARGS);
 
@@ -143,7 +206,7 @@ const char* dispatch_command(ServerContext* ctx, char* line) {
 
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
         if (strcmp(args[0], COMMAND_TABLE[i].name) == 0) {
-            return COMMAND_TABLE[i].handler(ctx, argc, args);
+            return COMMAND_TABLE[i].handler(ctx, argc, args, user_index, sent_to);
         }
     }
 

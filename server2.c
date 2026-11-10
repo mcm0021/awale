@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "server2.h"
 
@@ -34,8 +35,15 @@ void app(void)
    int max = sock;
    /* an array for all clients */
    User online_users[MAX_CLIENTS];
-   Game active_games[10];
-   (void)active_games;
+   Game active_games[MAX_GAMES];
+   ServerContext ctx = {
+      .online_users = online_users,
+      .user_capacity = MAX_CLIENTS,
+      .user_count = 0,
+      .active_games = active_games,
+      .game_capacity = MAX_GAMES,
+      .game_count = 0
+   };
 
    fd_set rdfs;
 
@@ -127,7 +135,21 @@ void app(void)
                }
                else
                {
-                  send_message_to_all_clients(online_users, user, actual, buffer, 0);
+                  /* Handle command */
+                  ctx.user_count = actual;
+                  size_t sent_to = SIZE_MAX; // Initialize sent_to to an invalid value
+
+                  handle_command(&ctx, buffer, buffer, BUF_SIZE, i, &sent_to);
+
+                  printf("Command from %s: %s\n", user.username, buffer);
+
+                  if (sent_to == SIZE_MAX) {
+                      // If sent_to was not set, send the response to all clients
+                      send_message_to_all_clients(online_users, user, actual, buffer, 0);
+                  } else {
+                      // If sent_to was set, send the response to the specified client
+                      write_client(online_users[sent_to].sockfd, buffer);
+                  }
                }
                break;
             }

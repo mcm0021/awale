@@ -30,6 +30,7 @@ typedef struct in_addr IN_ADDR;
 #define CRLF        "\r\n"
 #define PORT         1977
 #define MAX_CLIENTS     100
+#define MAX_GAMES       10
 
 #define BUF_SIZE    1024
 
@@ -39,13 +40,16 @@ typedef struct in_addr IN_ADDR;
 typedef struct ServerContext ServerContext;
 
 struct ServerContext {
-    User online_users[MAX_CLIENTS];
-    Game active_games[10];
+    User* online_users;
+    int user_capacity;
     int user_count;
+    Game* active_games;
+    int game_capacity;
+    int game_count;
 };
 
-int handle_command(ServerContext* ctx, const char* command_line, char* response_buffer, size_t buffer_size, char* send_to_usernames, size_t send_to_usernames_size);
-const char* dispatch_command(ServerContext* ctx, char* line);
+int handle_command(ServerContext* ctx, const char* command_line, char* response_buffer, size_t buffer_size, size_t user_index, size_t* sent_to);
+const char* dispatch_command(ServerContext* ctx, char* line, size_t user_index, size_t* sent_to);
 
 void init(void);
 void end(void);
