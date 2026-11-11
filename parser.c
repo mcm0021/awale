@@ -11,6 +11,7 @@
 #define ADD_FRIEND_COMMAND "add_friend"
 #define CHANGE_MODE_COMMAND "change_mode"
 #define SEND_MESSAGE_COMMAND "send_message"
+#define CHAT_COMMAND "chat:"
 #define GET_ONLINE_USERS_COMMAND "get_online_users"
 #define OBSERVE_COMMAND "observe"
 
@@ -20,13 +21,6 @@
 #define NEXT_MOVE_COMMAND "next_move"
 #define SAVE_GAME_COMMAND "save_game"
 #define QUIT_COMMAND "quit"
-
-static const char* ALL_COMMANDS[] = {
-    REGISTER_COMMAND, ADD_BIO_COMMAND, ADD_FRIEND_COMMAND,
-    CHANGE_MODE_COMMAND, SEND_MESSAGE_COMMAND, GET_ONLINE_USERS_COMMAND,
-    OBSERVE_COMMAND, CHALLENGE_COMMAND, ACCEPT_CHALLENGE_COMMAND,
-    NEXT_MOVE_COMMAND, SAVE_GAME_COMMAND, QUIT_COMMAND
-};
 
 typedef const char* (*CommandHandler)(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to);
 
@@ -55,7 +49,8 @@ const char* handle_add_bio(ServerContext* ctx, int argc, char** args, size_t use
 }
 
 const char* get_online_users(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
-    User* user = &ctx->online_users[user_index];
+    (void)argc;
+    (void)args;
     static char response[BUF_SIZE];
     response[0] = '\0';
 
@@ -119,17 +114,22 @@ const char* handle_change_mode(ServerContext* ctx, int argc, char** args, size_t
 }
 
 const char* handle_send_message(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
+    (void)ctx;
     if (argc < 2) {
-        return "Error: \n";
+        *sent_to = user_index;
+        return "Usage: chat: <message>\n";
     }
 
-    User* sender = &ctx->online_users[user_index];
-    const char* message = args[1];
-
-    char full_message[BUF_SIZE];
-    snprintf(full_message, sizeof(full_message), "%s: %s\n", sender->username, message);
+    static char message[BUF_SIZE];
+    message[0] = '\0';
+    for (int i = 1; i < argc; i++) {
+        if (i > 1) {
+            strncat(message, " ", sizeof(message) - strlen(message) - 1);
+        }
+        strncat(message, args[i], sizeof(message) - strlen(message) - 1);
+    }
     *sent_to = SIZE_MAX; 
-    return full_message; 
+    return message;
 }
 
 static const CommandMapping COMMAND_TABLE[] = {
@@ -137,7 +137,8 @@ static const CommandMapping COMMAND_TABLE[] = {
     { GET_ONLINE_USERS_COMMAND, get_online_users, "get_online_users" },
     { ADD_FRIEND_COMMAND, handle_add_friend, "add_friend <username>" },
     { CHANGE_MODE_COMMAND, handle_change_mode, "change_mode <public|private>" },
-    { SEND_MESSAGE_COMMAND, handle_send_message, "send_message <message>"}
+    { SEND_MESSAGE_COMMAND, handle_send_message, "send_message <message>" },
+    { CHAT_COMMAND, handle_send_message, "chat: <message>" }
 };
 
 #define NUM_COMMANDS (sizeof(COMMAND_TABLE) / sizeof(COMMAND_TABLE[0]))

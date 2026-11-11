@@ -15,6 +15,7 @@ typedef struct User {
     Game *saved_games[10];
     bool isprivate;
     struct User *friends[10];
+    char pending_challenge_from[MAX_USERNAME_LEN];
 } User;
 
 void registerUser(User *user, int sockfd);

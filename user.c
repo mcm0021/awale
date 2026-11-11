@@ -11,6 +11,7 @@ void registerUser(User* user, int sockfd) {
     memset(user->bio, 0, sizeof(user->bio));
     memset(user->saved_games, 0, sizeof(user->saved_games));
     memset(user->friends, 0, sizeof(user->friends));
+    memset(user->pending_challenge_from, 0, sizeof(user->pending_challenge_from));
 }
 
 void setUsername(User* user, const char* username) {

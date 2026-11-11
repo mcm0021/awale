@@ -3,7 +3,8 @@
 #include "game.h"
 
 void initGame(Game* g, User* p1, User* p2) {
-    g->id = 0; // You can set a unique ID for the game
+    static int next_id = 1;
+    g->id = next_id++;
     g->p1 = *p1;
     g->p2 = *p2;
     for (int i = 0; i < 6; i++) {
@@ -12,7 +13,11 @@ void initGame(Game* g, User* p1, User* p2) {
     }
     g->p1_score = 0;
     g->p2_score = 0;
+    g->current_player = 1;
+    g->is_active = 1;
+    g->watcher_count = 0;
     memset(g->moves, 0, sizeof(g->moves));
+    memset(g->watchers, 0, sizeof(g->watchers));
 }
 
 void p1Move(Game* g, int move) {
@@ -133,4 +138,47 @@ void displayBoard(Game* g) {
         printf("%d ", g->p2_board[i]);
     }
     printf("\nScores - Player 1: %d, Player 2: %d\n", g->p1_score, g->p2_score);
+}
+
+void getBoardString(Game* g, char* buffer, size_t size) {
+    if (g == NULL || buffer == NULL || size == 0) return;
+
+    snprintf(buffer, size,
+        "\n=============================================================\n"
+        "Game #%d | Turn: Player %d (%s)\n"
+        "Player 2: %s [Score: %d]\n"
+        "  Pits:    (5)  (4)  (3)  (2)  (1)  (0)\n"
+        "  Seeds:  [%2d] [%2d] [%2d] [%2d] [%2d] [%2d]\n"
+        "-------------------------------------------------------------\n"
+        "  Seeds:  [%2d] [%2d] [%2d] [%2d] [%2d] [%2d]\n"
+        "  Pits:    (0)  (1)  (2)  (3)  (4)  (5)\n"
+        "Player 1: %s [Score: %d]\n"
+        "=============================================================\n",
+        g->id,
+        g->current_player,
+        (g->current_player == 1 ? g->p1.username : g->p2.username),
+        g->p2.username, g->p2_score,
+        g->p2_board[5], g->p2_board[4], g->p2_board[3],
+        g->p2_board[2], g->p2_board[1], g->p2_board[0],
+        g->p1_board[0], g->p1_board[1], g->p1_board[2],
+        g->p1_board[3], g->p1_board[4], g->p1_board[5],
+        g->p1.username, g->p1_score
+    );
+}
+
+int isGameOver(Game* g) {
+    if (g == NULL || !g->is_active) return 0;
+    if (g->p1_score >= 25) return 1;
+    if (g->p2_score >= 25) return 2;
+    if (g->p1_score == 24 && g->p2_score == 24) return 3;
+    int remaining = 0;
+    for (int i = 0; i < 6; i++) {
+        remaining += g->p1_board[i] + g->p2_board[i];
+    }
+    if (remaining < 6) {
+        if (g->p1_score > g->p2_score) return 1;
+        if (g->p2_score > g->p1_score) return 2;
+        return 3;
+    }
+    return 0;
 }
