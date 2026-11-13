@@ -22,6 +22,7 @@
 #define WATCH_COMMAND "watch"
 #define SAVED_GAMES_COMMAND "saved"
 #define REVIEW_COMMAND "review"
+#define QUIT_COMMAND "quit"
 
 typedef const char* (*CommandHandler)(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to);
 
@@ -86,6 +87,61 @@ static int find_user(ServerContext *ctx, const char *username)
          return j;
    }
    return -1;
+}
+
+/* Removes this socket from the spectators of every game. */
+static void stop_watching(ServerContext *ctx, SOCKET sockfd)
+{
+   for(int g = 0; g < ctx->game_capacity; g++)
+   {
+      Game *game = &ctx->active_games[g];
+      for(int w = 0; w < game->watcher_count; w++)
+      {
+         if(game->watchers[w] == sockfd)
+         {
+            memmove(&game->watchers[w], &game->watchers[w + 1],
+                    (game->watcher_count - w - 1) * sizeof(int));
+            game->watcher_count--;
+            w--;
+         }
+      }
+   }
+}
+
+/* Called when a user quits or disconnects: the game ends (no leaderboard points),
+   the user stops watching, its challenges are cancelled, and it is removed
+   from the online users. */
+void remove_user(ServerContext *ctx, int index)
+{
+   User user = ctx->online_users[index];
+   closesocket(user.sockfd);
+
+   for(int g = 0; g < ctx->game_capacity; g++)
+   {
+      Game *game = &ctx->active_games[g];
+      if(!game->is_active || (game->p1.sockfd != user.sockfd && game->p2.sockfd != user.sockfd))
+         continue;
+      SOCKET winner = (game->p1.sockfd == user.sockfd) ? game->p2.sockfd : game->p1.sockfd;
+      write_client(winner, "*** Opponent left the game. Game over (no points). ***\n");
+      send_board_to_watchers(game, "*** A player disconnected. Game over. ***\n");
+      game->is_active = 0;
+   }
+   stop_watching(ctx, user.sockfd);
+
+   /* cancel challenges sent by this user */
+   for(int u = 0; u < ctx->user_count; u++)
+   {
+      if(strcmp(ctx->online_users[u].pending_challenge_from, user.username) == 0)
+         ctx->online_users[u].pending_challenge_from[0] = 0;
+   }
+   for(int s = 0; s < 10; s++)
+      free(user.saved_games[s]);
+
+   remove_client(ctx->online_users, index, &ctx->user_count);
+
+   char msg[BUF_SIZE];
+   snprintf(msg, sizeof(msg), "%s disconnected !", user.username);
+   send_message_to_all_clients(ctx->online_users, user, ctx->user_count, msg, 1);
 }
 
 const char* handle_add_bio(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to) {
@@ -295,6 +351,9 @@ static const char *handle_accept_cmd(ServerContext *ctx, int argc, char **args,
       return "One of you is already playing a game.\n";
 
    sender->pending_challenge_from[0] = 0;
+   /* players stop watching other games when their own game starts */
+   stop_watching(ctx, challenger->sockfd);
+   stop_watching(ctx, sender->sockfd);
    start_game(ctx->active_games, ctx->game_capacity, challenger, sender);
    return "";
 }
@@ -466,6 +525,8 @@ static const char *handle_watch_game_cmd(ServerContext *ctx, int argc, char **ar
 
    if(argc < 2)
       return "Usage: watch <id>\n";
+   if(is_in_game(ctx, viewer->sockfd))
+      return "You cannot watch a game while playing one.\n";
 
    char *end = NULL;
    long requested_id = strtol(args[1], &end, 10);
@@ -479,8 +540,6 @@ static const char *handle_watch_game_cmd(ServerContext *ctx, int argc, char **ar
          continue;
       if(!can_view_game(ctx->online_users, ctx->user_count, game, viewer))
          return "You cannot watch this private game.\n";
-      if(game->p1.sockfd == viewer->sockfd || game->p2.sockfd == viewer->sockfd)
-         return "You are already playing this game.\n";
       for(int w = 0; w < game->watcher_count; w++)
       {
          if(game->watchers[w] == viewer->sockfd)
@@ -571,6 +630,17 @@ static const char *handle_review_cmd(ServerContext *ctx, int argc, char **args,
    return "Saved game not found. Type 'saved games' to list them.\n";
 }
 
+static const char *handle_quit_cmd(ServerContext *ctx, int argc, char **args,
+                                   size_t user_index, size_t *sent_to)
+{
+   (void)argc;
+   (void)args;
+   *sent_to = user_index;
+   write_client(ctx->online_users[user_index].sockfd, "Goodbye!\n");
+   remove_user(ctx, (int)user_index);
+   return ""; /* the user is gone: nothing more to send */
+}
+
 static const CommandMapping COMMAND_TABLE[] = {
     { ADD_BIO_COMMAND,  handle_add_bio,  "add_bio <bio line>" },
     { BIO_COMMAND, handle_bio, "bio <username>" },
@@ -585,7 +655,8 @@ static const CommandMapping COMMAND_TABLE[] = {
     { ONLINE_GAMES_COMMAND, handle_online_games_cmd, "online games" },
     { WATCH_COMMAND, handle_watch_game_cmd, "watch <id>" },
     { SAVED_GAMES_COMMAND, handle_saved_games_cmd, "saved games" },
-    { REVIEW_COMMAND, handle_review_cmd, "review <id>" }
+    { REVIEW_COMMAND, handle_review_cmd, "review <id>" },
+    { QUIT_COMMAND, handle_quit_cmd, "quit" }
 };
 
 #define NUM_COMMANDS (sizeof(COMMAND_TABLE) / sizeof(COMMAND_TABLE[0]))

@@ -206,55 +206,9 @@ void app(void)
                /* client disconnected */
                if(c == 0)
                {
-                  closesocket(online_users[i].sockfd);
-
-                  /* If user was in an active game, notify opponent and end game */
-                  for(int g = 0; g < MAX_GAMES; g++)
-                  {
-                     if(active_games[g].is_active)
-                     {
-                        if(active_games[g].p1.sockfd == user.sockfd)
-                        {
-                           write_client(active_games[g].p2.sockfd, "*** Opponent disconnected! You win by forfeit. ***\n");
-                           add_score(online_users, actual, active_games[g].p2.sockfd, 1);
-                           send_board_to_watchers(&active_games[g], "*** A player disconnected. Game over. ***\n");
-                           active_games[g].is_active = 0;
-                        }
-                        else if(active_games[g].p2.sockfd == user.sockfd)
-                        {
-                           write_client(active_games[g].p1.sockfd, "*** Opponent disconnected! You win by forfeit. ***\n");
-                           add_score(online_users, actual, active_games[g].p1.sockfd, 1);
-                           send_board_to_watchers(&active_games[g], "*** A player disconnected. Game over. ***\n");
-                           active_games[g].is_active = 0;
-                        }
-                     }
-                     for(int w = 0; w < active_games[g].watcher_count; w++)
-                     {
-                        if(active_games[g].watchers[w] == user.sockfd)
-                        {
-                           memmove(&active_games[g].watchers[w],
-                                   &active_games[g].watchers[w + 1],
-                                   (active_games[g].watcher_count - w - 1) * sizeof(int));
-                           active_games[g].watcher_count--;
-                           w--;
-                        }
-                     }
-                  }
-
-                  /* cancel challenges sent by this user */
-                  for(int u = 0; u < actual; u++)
-                  {
-                     if(strcmp(online_users[u].pending_challenge_from, user.username) == 0)
-                        online_users[u].pending_challenge_from[0] = 0;
-                  }
-                  for(int s = 0; s < 10; s++)
-                     free(user.saved_games[s]);
-
-                  remove_client(online_users, i, &actual);
-                  strncpy(buffer, user.username, BUF_SIZE - 1);
-                  buffer[BUF_SIZE - 1] = 0;
-                  strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
-                  send_message_to_all_clients(online_users, user, actual, buffer, 1);
+                  ctx.user_count = actual;
+                  remove_user(&ctx, i);
+                  actual = ctx.user_count;
                }
                else
                {
@@ -264,10 +218,12 @@ void app(void)
                   printf("Command from %s: %s\n", user.username, buffer);
                   handle_command(&ctx, buffer, buffer, BUF_SIZE, i, &sent_to);
 
-                  if (sent_to == SIZE_MAX) {
-                      send_message_to_all_clients(online_users, user, actual, buffer, 0);
+                  if (ctx.user_count < actual) {
+                     actual = ctx.user_count; /* the user typed quit and was removed */
+                  } else if (sent_to == SIZE_MAX) {
+                     send_message_to_all_clients(online_users, user, actual, buffer, 0);
                   } else if (buffer[0] != '\0') {
-                      write_client(online_users[sent_to].sockfd, buffer);
+                     write_client(online_users[sent_to].sockfd, buffer);
                   }
                }
                break;
@@ -341,6 +297,8 @@ int init_connection(void)
    if(bind(sock,(SOCKADDR *) &sin, sizeof sin) == SOCKET_ERROR)
    {
       perror("bind()");
+      if(errno == EADDRINUSE)
+         fprintf(stderr, "Port %d is used by another program (is another server2 still running?).\n", PORT);
       exit(errno);
    }
 

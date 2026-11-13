@@ -53,6 +53,7 @@ const char* dispatch_command(ServerContext* ctx, char* line, size_t user_index, 
 void start_game(Game *active_games, int max_games, User *p1, User *p2);
 void add_score(User *online_users, int actual, SOCKET sockfd, int amount);
 void send_board_to_watchers(Game *game, const char *message);
+void remove_user(ServerContext *ctx, int index);
 
 void init(void);
 void end(void);

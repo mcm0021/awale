@@ -171,8 +171,8 @@ On your turn, type the number of one of your pits:
 ```
 
 The server sends the updated board to both players and to all spectators after
-every move. If a player disconnects during a game, the opponent wins by
-forfeit.
+every move. If a player quits or disconnects during a game, the game ends and
+nobody gets leaderboard points.
 
 ### List and watch ongoing games
 
@@ -182,7 +182,8 @@ watch 1
 ```
 
 `online games` lists the active games you are allowed to watch. `watch <id>`
-sends you the current board, then every update and the final result.
+sends you the current board, then every update and the final result. You
+cannot watch while playing, and you stop watching when your own game starts.
 
 ### Saved games
 
@@ -204,9 +205,9 @@ leaderboard
 ```
 
 Lists the online users from the highest score to the lowest. A win gives
-`+1` and a loss gives `-1` (a tie changes nothing). Winning because the
-opponent disconnected also counts as a win. Scores start at `+0` when a user
-connects and are kept only while the user stays connected.
+`+1` and a loss gives `-1` (a tie changes nothing). A game ended by a
+player quitting or disconnecting changes nothing. Scores start at `+0` when a
+user connects and are kept only while the user stays connected.
 
 Example:
 
@@ -216,6 +217,15 @@ Leaderboard:
 2. Carol +0
 3. Bob -1
 ```
+
+### Quit
+
+```text
+quit
+```
+
+Disconnects from the server. This is the same as closing the client: if you
+are in a game, the game ends without leaderboard points.
 
 ## Standalone Local Game
 
@@ -233,7 +243,7 @@ It supports two local players in the same terminal:
 ## Project Files
 
 - `server2.c` - TCP server: connections, `select()` loop, starting games,
-  disconnects and forfeits.
+  disconnects.
 - `client2.c` - terminal TCP client.
 - `command_handler.c` - parses every command and runs it: chat, bios,
   friends, privacy, challenges, moves, watching, saved games, leaderboard.

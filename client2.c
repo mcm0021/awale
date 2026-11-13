@@ -79,7 +79,7 @@ static void app(const char *address, const char *name)
          /* server down */
          if(n == 0)
          {
-            printf("Server disconnected !\n");
+            printf("Disconnected!\n");
             break;
          }
          fputs(buffer, stdout); /* print exactly what was received */
