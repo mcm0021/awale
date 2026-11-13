@@ -5,8 +5,8 @@ TARGETS = server2 client2 awale_01
 
 all: $(TARGETS)
 
-server2: server2.c user.c game.c parser.c server2.h user.h game.h
-	$(CC) $(CFLAGS) server2.c user.c game.c parser.c -o server2
+server2: server2.c user.c game.c command_handler.c server2.h user.h game.h
+	$(CC) $(CFLAGS) server2.c user.c game.c command_handler.c -o server2
 
 client2: client2.c client2.h
 	$(CC) $(CFLAGS) client2.c -o client2

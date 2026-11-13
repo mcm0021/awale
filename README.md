@@ -61,7 +61,7 @@ make clean
 Alternatively, compile manually:
 
 ```bash
-gcc -Wall -Wextra -Werror server2.c user.c game.c parser.c -o server2
+gcc -Wall -Wextra -Werror server2.c user.c game.c command_handler.c -o server2
 gcc -Wall -Wextra -Werror client2.c -o client2
 gcc -Wall -Wextra -Werror awale_01.c -o awale_01
 ```
@@ -232,11 +232,11 @@ It supports two local players in the same terminal:
 
 ## Project Files
 
-- `server2.c` - TCP server, client management, challenges, games, spectators,
-  and saved games.
+- `server2.c` - TCP server: connections, `select()` loop, starting games,
+  disconnects and forfeits.
 - `client2.c` - terminal TCP client.
-- `parser.c` - chat, bio, friend, privacy, online-user and leaderboard
-  commands.
+- `command_handler.c` - parses every command and runs it: chat, bios,
+  friends, privacy, challenges, moves, watching, saved games, leaderboard.
 - `user.c` / `user.h` - user data: bio, friends, privacy, saved games, score.
 - `game.c` / `game.h` - board, moves, captures, legality checks, game end.
 - `awale_01.c` - standalone local game.
