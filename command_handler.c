@@ -23,6 +23,7 @@
 #define SAVED_GAMES_COMMAND "saved"
 #define REVIEW_COMMAND "review"
 #define QUIT_COMMAND "quit"
+#define HELP_COMMAND "help"
 
 typedef const char* (*CommandHandler)(ServerContext* ctx, int argc, char** args, size_t user_index, size_t* sent_to);
 
@@ -641,6 +642,9 @@ static const char *handle_quit_cmd(ServerContext *ctx, int argc, char **args,
    return ""; /* the user is gone: nothing more to send */
 }
 
+static const char *handle_help_cmd(ServerContext *ctx, int argc, char **args,
+                                   size_t user_index, size_t *sent_to);
+
 static const CommandMapping COMMAND_TABLE[] = {
     { ADD_BIO_COMMAND,  handle_add_bio,  "add_bio <bio line>" },
     { BIO_COMMAND, handle_bio, "bio <username>" },
@@ -656,11 +660,30 @@ static const CommandMapping COMMAND_TABLE[] = {
     { WATCH_COMMAND, handle_watch_game_cmd, "watch <id>" },
     { SAVED_GAMES_COMMAND, handle_saved_games_cmd, "saved games" },
     { REVIEW_COMMAND, handle_review_cmd, "review <id>" },
-    { QUIT_COMMAND, handle_quit_cmd, "quit" }
+    { QUIT_COMMAND, handle_quit_cmd, "quit" },
+    { HELP_COMMAND, handle_help_cmd, "help" }
 };
 
 #define NUM_COMMANDS (sizeof(COMMAND_TABLE) / sizeof(COMMAND_TABLE[0]))
 
+/* Lists every command, using the usage strings of the table. */
+static const char *handle_help_cmd(ServerContext *ctx, int argc, char **args,
+                                   size_t user_index, size_t *sent_to)
+{
+   (void)ctx;
+   (void)argc;
+   (void)args;
+   static char response[BUF_SIZE];
+   *sent_to = user_index;
+
+   snprintf(response, sizeof(response), "Commands:\n  <pit 0-5>   (play a move)\n");
+   for(size_t i = 0; i < NUM_COMMANDS; i++)
+   {
+      size_t used = strlen(response);
+      snprintf(response + used, sizeof(response) - used, "  %s\n", COMMAND_TABLE[i].usage);
+   }
+   return response;
+}
 int handle_command(ServerContext* ctx, const char* command_line, char* response_buffer, size_t buffer_size, size_t user_index, size_t* sent_to) {
 
     if (command_line == NULL || response_buffer == NULL || buffer_size == 0) {

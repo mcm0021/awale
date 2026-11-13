@@ -103,6 +103,14 @@ Commands are typed into a connected client. Each command is sent when the
 line is submitted. Replies and errors are sent only to the user who typed the
 command; chat messages and disconnect notices go to everyone.
 
+### Help
+
+```text
+help
+```
+
+Lists all the commands.
+
 ### Online users
 
 ```text
