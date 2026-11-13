@@ -8,6 +8,8 @@ project provides:
 - Challenges between any two online players.
 - Live game listings and spectators.
 - Public and private game visibility.
+- Saved games that players can review.
+- A simple leaderboard.
 - A standalone local version of the game.
 
 The network implementation is written in C and uses TCP sockets with
@@ -17,19 +19,24 @@ The network implementation is written in C and uses TCP sockets with
 
 Each player has six pits containing four seeds at the beginning of a game.
 Players take turns choosing one of their pits. The seeds from that pit are
-sown one at a time into the following pits. Captures are made according to the
-Awale/Oware rules implemented by the server.
+sown one at a time into the following pits (the starting pit is skipped when
+there are 12 seeds or more).
 
-The network board labels Player 1's pits from `0` to `5` and Player 2's pits
-from `0` to `5`. On a player's turn, choose one of their own non-empty pits:
+If the last seed lands on the opponent's side and makes that pit hold 2 or 3
+seeds, those seeds are captured, together with the previous pits on the
+opponent's side that also hold 2 or 3 seeds.
 
-```text
-move 2
-```
+The server checks every move:
 
-The server sends the updated board to both players after every move. A game
-ends when a player reaches 25 captured seeds or when the remaining board state
-ends the game. The player with the higher score wins.
+- The pit must be one of the player's own pits (`0` to `5`) and not empty.
+- If the opponent has no seeds, the player must play a move that gives them
+  seeds.
+- A move that would capture all of the opponent's seeds captures nothing.
+
+The game ends when a player has captured 25 seeds or more, when fewer than 6
+seeds remain on the board, or when the player to move has no legal move (each
+player then keeps the seeds on their own side). The player with the higher
+score wins.
 
 ## Building
 
@@ -45,7 +52,7 @@ This creates:
 - `client2` - the network client.
 - `awale_01` - the standalone local game.
 
-Remove generated binaries with:
+Remove the generated binaries with:
 
 ```bash
 make clean
@@ -87,152 +94,128 @@ In another terminal:
 ./client2 127.0.0.1 Bob
 ```
 
-The final argument is the player's username. Start additional clients with
-different usernames to use chat or watch games.
+The final argument is the player's username. Usernames must be unique; a
+client using a name that is already online is disconnected.
 
 ## Network Commands
 
 Commands are typed into a connected client. Each command is sent when the
-line is submitted.
-
-### Global chat
-
-Send a message to every other online user:
-
-```text
-chat: hello everyone
-```
-
-Other clients receive:
-
-```text
-Alice: hello everyone
-```
-
-The sender does not receive a second copy of their own chat message.
-
-The older command form is also accepted:
-
-```text
-send_message hello everyone
-```
+line is submitted. Replies and errors are sent only to the user who typed the
+command; chat messages and disconnect notices go to everyone.
 
 ### Online users
-
-List the currently connected users:
 
 ```text
 get_online_users
 ```
 
-The response includes each username and their bio.
+### Chat
+
+Send a message to every other online user, during or outside a game:
+
+```text
+chat: hello everyone
+```
+
+Other clients receive `Alice: hello everyone`.
 
 ### Bios
 
-Set a user's bio:
+A bio has up to 10 lines. Each `add_bio` adds one line:
 
 ```text
-add_bio student
+add_bio Second year student
+add_bio I like board games
+```
+
+Show the bio of any online user:
+
+```text
+bio Alice
 ```
 
 ### Friends and privacy
 
-Add an online user as a friend:
-
 ```text
 add_friend Bob
-```
-
-Change visibility mode:
-
-```text
-change_mode public
 change_mode private
+change_mode public
 ```
 
-Public mode allows all online users to see the player's ongoing games.
-Private mode limits visibility of a game to:
+Anyone can watch the games of a public player. Only friends can watch the
+games of a private player. If either player of a game is private, a spectator
+must be that player's friend.
 
-- The players in that game.
-- Friends added by the private player.
-
-For a game to be visible to a spectator, the spectator must be allowed by
-both players. Therefore, if either player is private, spectators must be
-friends with that private player.
-
-### Challenge and accept a game
-
-Challenge another online player:
-
-```text
-challenge -Bob
-```
-
-The equivalent form is:
+### Challenge, accept, refuse
 
 ```text
 challenge Bob
 ```
 
-Bob receives a challenge notification. Bob can accept it with:
+Bob is notified and answers with one of:
 
 ```text
 accept Alice
+refuse Alice
 ```
 
-If Bob has only one pending challenge, this is also sufficient:
-
-```text
-accept
-```
-
-The server rejects challenges to offline users, oneself, or players already in
-another game.
+The server randomly decides who starts. The server rejects challenges to
+offline users, to oneself, and to players who are already in a game.
 
 ### Play a game
 
-After a challenge is accepted, both players receive the game identifier and
-the initial board. The player whose turn it is can make a move with:
+On your turn, type the number of one of your pits:
 
 ```text
-move 2
+2
 ```
 
-`next_move 2` is also accepted. Pits must be numbered from `0` to `5`, and the
-selected pit must contain seeds. The server rejects moves made out of turn,
-invalid pit numbers, and empty pits.
+The server sends the updated board to both players and to all spectators after
+every move. If a player disconnects during a game, the opponent wins by
+forfeit.
 
-### List ongoing games
-
-List active games visible to the current user:
+### List and watch ongoing games
 
 ```text
 online games
+watch 1
 ```
+
+`online games` lists the active games you are allowed to watch. `watch <id>`
+sends you the current board, then every update and the final result.
+
+### Saved games
+
+Every finished game is saved for both players, for as long as they stay
+connected.
+
+```text
+saved games
+review 1
+```
+
+`saved games` lists your saved games. `review <id>` shows the board after
+every move of that game, then the final score.
+
+### Leaderboard
+
+```text
+leaderboard
+```
+
+Lists the online users from the highest score to the lowest. A win gives
+`+1` and a loss gives `-1` (a tie changes nothing). Winning because the
+opponent disconnected also counts as a win. Scores start at `+0` when a user
+connects and are kept only while the user stays connected.
 
 Example:
 
 ```text
-Game 1: Alice vs Bob
-Game 2: Carol vs Dave
+Leaderboard:
+1. Alice +2
+2. Carol +0
+3. Bob -1
 ```
-
-Private games that the user is not allowed to view are omitted.
-
-### Watch an ongoing game
-
-Use the game ID from `online games`:
-
-```text
-watch game -1
-```
-
-The watcher immediately receives the current board. After that, every board
-update and the final game-over message are sent to the watcher in real time.
-A player cannot watch their own game.
-
-If the game no longer exists, is not active, or is private to the requester,
-the server reports an error instead.
 
 ## Standalone Local Game
 
@@ -249,11 +232,12 @@ It supports two local players in the same terminal:
 
 ## Project Files
 
-- `server2.c` - TCP server, client management, challenges, games, and
-  spectators.
+- `server2.c` - TCP server, client management, challenges, games, spectators,
+  and saved games.
 - `client2.c` - terminal TCP client.
-- `parser.c` - command parsing for chat and user commands.
-- `user.c` / `user.h` - user, friend, bio, and privacy data.
-- `game.c` / `game.h` - board state, moves, captures, scores, and game IDs.
+- `parser.c` - chat, bio, friend, privacy, online-user and leaderboard
+  commands.
+- `user.c` / `user.h` - user data: bio, friends, privacy, saved games, score.
+- `game.c` / `game.h` - board, moves, captures, legality checks, game end.
 - `awale_01.c` - standalone local game.
 - `Makefile` - build and clean commands.

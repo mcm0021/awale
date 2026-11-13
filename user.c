@@ -7,8 +7,10 @@
 void registerUser(User* user, int sockfd) {
     user->sockfd = sockfd;
     user->isprivate = false;
+    user->score = 0;
     memset(user->username, 0, sizeof(user->username));
     memset(user->bio, 0, sizeof(user->bio));
+    user->bio_lines = 0;
     memset(user->saved_games, 0, sizeof(user->saved_games));
     memset(user->friends, 0, sizeof(user->friends));
     memset(user->pending_challenge_from, 0, sizeof(user->pending_challenge_from));
@@ -19,21 +21,26 @@ void setUsername(User* user, const char* username) {
     user->username[sizeof(user->username) - 1] = '\0';
 }
 
-void setBio(User* user, const char* bio) {
-    strncpy(user->bio, bio, sizeof(user->bio) - 1);
-    user->bio[sizeof(user->bio) - 1] = '\0';
+/* Appends one line to the bio. Returns 0 if the bio already has 10 lines. */
+int addBioLine(User* user, const char* line) {
+    if (user->bio_lines >= BIO_LINES) {
+        return 0;
+    }
+    strncpy(user->bio[user->bio_lines], line, BIO_LINE_LEN - 1);
+    user->bio[user->bio_lines][BIO_LINE_LEN - 1] = '\0';
+    user->bio_lines++;
+    return 1;
 }
 
-void addFriend(User* user, User* friend) {
-    if (!user->isprivate){
-        return; // cannot add friends if the user is public
-    }
+/* Returns 0 if the friend list is full. */
+int addFriend(User* user, const char* name) {
     for (int i = 0; i < 10; i++) {
-        if (user->friends[i] == NULL) {
-            user->friends[i] = friend;
-            break;
+        if (user->friends[i][0] == '\0') {
+            strncpy(user->friends[i], name, MAX_USERNAME_LEN - 1);
+            return 1;
         }
     }
+    return 0;
 }
 
 

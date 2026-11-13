@@ -13,8 +13,8 @@ client2: client2.c client2.h
 
 awale_01: awale_01.c
 	$(CC) $(CFLAGS) awale_01.c -o awale_01
-
+	
 clean:
-	rm -f $(TARGETS) *.o
+	rm -f $(TARGETS) server client *.o
 
 .PHONY: all clean

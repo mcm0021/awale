@@ -82,7 +82,8 @@ static void app(const char *address, const char *name)
             printf("Server disconnected !\n");
             break;
          }
-         puts(buffer);
+         fputs(buffer, stdout); /* print exactly what was received */
+         fflush(stdout);
       }
    }
 
